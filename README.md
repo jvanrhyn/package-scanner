@@ -23,8 +23,9 @@ Results can be displayed to the console and optionally stored in a PostgreSQL da
   - Vulnerability ID and summary
   - Severity rating (out of 10)
   - Minimum version to fix vulnerability
-- PostgreSQL database integration for storing results
+- PostgreSQL database integration for storing vulnerability results
 - Environment variable configuration via `.env` files
+- Smart package name and version extraction from filenames
 
 ## Requirements
 
@@ -90,6 +91,8 @@ OSV_API_URL=https://api.osv.dev/v1/query
 
 Package Scanner will automatically create the necessary tables on first run. Ensure your PostgreSQL user has sufficient privileges to create tables.
 
+**Note:** The application only saves results to the database when vulnerabilities are found. This keeps your database clean and focused on actual security issues.
+
 ## Usage
 
 ### Single Package Scan
@@ -100,7 +103,7 @@ To check a specific package for vulnerabilities:
 # Basic usage
 ./package-scanner --package="Microsoft.AspNetCore.Identity" --version="2.3.0" --ecosystem="NuGet"
 
-# Save results to database
+# Save results to database (only if vulnerabilities are found)
 ./package-scanner --package="lodash" --version="4.17.15" --ecosystem="npm" --save-db
 ```
 
@@ -168,6 +171,7 @@ Found 1 vulnerabilities:
    Severity Rating: 7.0-8.9/10
    Fix Version: 2.3.1
    ---
+Info: Results successfully saved to PostgreSQL database.
 Info: Raw API response written to api_response.json
 ```
 
@@ -179,8 +183,20 @@ Info:   Package: secure-package
 Info:   Version: 1.0.0
 Info:   Ecosystem: npm
 No vulnerabilities found for the specified package and version.
+Info: No vulnerabilities found. Nothing saved to database.
 Info: Raw API response written to api_response.json
 ```
+
+## Package Name Extraction
+
+The scanner automatically detects package names and versions from filenames. It has specific handling for:
+
+- **NuGet** packages: Correctly extracts names with multiple segments (like `Microsoft.AspNetCore.Identity.2.3.0.nupkg`)
+- **npm** packages: Handles packages with hyphens in names and versions (like `lodash-4.17.15.tgz`)
+- **Python** packages: Processes wheel and egg formats correctly
+- **Java** packages: Extracts Maven artifact information from JAR files
+
+If the package format is not recognized, a fallback parser attempts to extract names and versions using common conventions.
 
 ## Project Structure
 
@@ -202,6 +218,9 @@ Info: Raw API response written to api_response.json
 │   └── scanner/                  # Package scanning utilities
 │       ├── controller.go         # Scanning orchestration
 │       └── scanner.go            # Package file scanning logic
+├── test/                         # Test directory
+│   └── extraction/               # Package extraction tests
+│       └── main.go               # Test code for extraction logic
 ```
 
 ## Architecture
