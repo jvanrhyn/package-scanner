@@ -90,8 +90,8 @@ func (c *Controller) runSinglePackageScan() {
 	// Display results
 	c.reporter.DisplayResults(results, c.config.PackageName)
 
-	// Save to database if requested
-	if c.config.UseDB && c.dbInstance != nil {
+	// Save to database if requested AND vulnerabilities were found
+	if c.config.UseDB && c.dbInstance != nil && len(results.Vulnerabilities) > 0 {
 		err = c.dbInstance.SaveVulnerabilityResults(
 			c.config.PackageName,
 			c.config.PackageEcosystem,
@@ -105,6 +105,8 @@ func (c *Controller) runSinglePackageScan() {
 		}
 
 		c.reporter.DisplayInfo("Results successfully saved to PostgreSQL database.")
+	} else if c.config.UseDB && len(results.Vulnerabilities) == 0 {
+		c.reporter.DisplayInfo("No vulnerabilities found. Nothing saved to database.")
 	}
 
 	// Write raw response to file
@@ -156,8 +158,8 @@ func (c *Controller) runDirectoryScan() {
 			// Display results
 			c.reporter.DisplayResults(results, pkg.Name)
 
-			// Save to database if requested
-			if c.config.UseDB && c.dbInstance != nil {
+			// Save to database if requested AND vulnerabilities were found
+			if c.config.UseDB && c.dbInstance != nil && len(results.Vulnerabilities) > 0 {
 				err = c.dbInstance.SaveVulnerabilityResults(
 					pkg.Name,
 					pkg.Ecosystem,
@@ -168,7 +170,11 @@ func (c *Controller) runDirectoryScan() {
 
 				if err != nil {
 					c.reporter.DisplayError("Error saving results to database for %s: %v", pkg.Name, err)
+				} else {
+					c.reporter.DisplayInfo("Results for %s@%s saved to database.", pkg.Name, pkg.Version)
 				}
+			} else if c.config.UseDB && len(results.Vulnerabilities) == 0 {
+				c.reporter.DisplayInfo("No vulnerabilities found for %s@%s. Nothing saved to database.", pkg.Name, pkg.Version)
 			}
 		}(pkg)
 	}
