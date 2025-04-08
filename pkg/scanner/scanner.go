@@ -135,42 +135,46 @@ func parseNuGetPackage(filename string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid NuGet package filename format: %s", filename)
 	}
 
-	// Define regex for version: digits.digits[.digits][.digits][-suffix]
-	// This is a more strict version regex to avoid matching normal parts of package name
-	versionRegex := regexp.MustCompile(`^(\d+\.\d+(\.\d+)?(\.\d+)?(-[a-zA-Z0-9.-]+)?)$`)
+	// Define regex for version pattern that matches common NuGet version formats
+	// This pattern looks for sequences like: 1.0, 1.0.0, 1.0.0.0, 1.0-beta, etc.
+	versionRegex := regexp.MustCompile(`^\d+(\.\d+)+(-[a-zA-Z0-9.-]+)?$`)
 
-	// Start from the end and work backwards to find the first part that looks like a version
-	// This handles multi-segment package names with periods
-	versionIndex := -1
+	// Find the starting index of the version
+	// We need to identify where the package name ends and the version begins
+	versionStartIndex := -1
 
+	// Start from the end and work backwards
+	// We're looking for the longest consecutive sequence of version-like segments
 	for i := len(parts) - 1; i >= 0; i-- {
-		if versionRegex.MatchString(parts[i]) {
-			versionIndex = i
+		// Check if this part could be the start of a version
+		if versionRegex.MatchString(strings.Join(parts[i:], ".")) {
+			versionStartIndex = i
+		} else if versionStartIndex != -1 {
+			// If we've already found a version start and this part doesn't match,
+			// we've gone too far back, so break
 			break
 		}
 	}
 
-	// If no version was found, use a fallback approach with a more lenient pattern
-	if versionIndex == -1 {
-		// Try a more lenient version pattern: just check if it starts with a number
-		lenientVersionRegex := regexp.MustCompile(`^\d+`)
-
+	// If no version pattern was found, fall back to simpler detection
+	if versionStartIndex == -1 {
+		// Try a more lenient approach - look for any segment that starts with a number
 		for i := len(parts) - 1; i >= 0; i-- {
-			if lenientVersionRegex.MatchString(parts[i]) {
-				versionIndex = i
+			if regexp.MustCompile(`^\d+`).MatchString(parts[i]) {
+				versionStartIndex = i
 				break
 			}
 		}
 
 		// If still no match, assume the last component is the version
-		if versionIndex == -1 {
-			versionIndex = len(parts) - 1
+		if versionStartIndex == -1 {
+			versionStartIndex = len(parts) - 1
 		}
 	}
 
 	// Extract the name and version
-	name := strings.Join(parts[:versionIndex], ".")
-	version := parts[versionIndex]
+	name := strings.Join(parts[:versionStartIndex], ".")
+	version := strings.Join(parts[versionStartIndex:], ".")
 
 	// For debugging purposes
 	fmt.Printf("Extracted package: name='%s', version='%s' from '%s'\n", name, version, filename)
