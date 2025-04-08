@@ -63,17 +63,20 @@ func (ps *PackageScanner) ScanDirectory(dirPath string) ([]PackageInfo, error) {
 			return nil
 		}
 
-		// Check file extension
+		// Check file extension - case insensitive matching
 		if !strings.HasSuffix(strings.ToLower(d.Name()), "."+strings.ToLower(ps.FileExtension)) {
 			return nil
 		}
 
-		// Extract package info from filename
+		// Extract package info from filename - preserve original case
 		pkg, err := ps.ExtractPackageInfo(d.Name())
 		if err != nil {
 			fmt.Printf("Warning: Could not parse package information from %s: %v\n", d.Name(), err)
 			return nil
 		}
+
+		// Add additional case sensitivity warning if applicable
+		logCaseSensitivityWarning(pkg.Name, pkg.Ecosystem)
 
 		packages = append(packages, pkg)
 		return nil
@@ -120,8 +123,8 @@ func (ps *PackageScanner) ExtractPackageInfo(filename string) (PackageInfo, erro
 // parseNuGetPackage extracts name and version from a NuGet package filename
 // Format: PackageName.Version.nupkg
 func parseNuGetPackage(filename string) (string, string, error) {
-	// Remove extension
-	base := strings.TrimSuffix(filename, ".nupkg")
+	// Remove extension - case insensitive matching but preserve original case
+	base := strings.TrimSuffix(strings.TrimSuffix(filename, ".nupkg"), ".NUPKG")
 
 	// NuGet packages typically use format PackageName.Version.nupkg
 	// or PackageName.Version.Suffix.nupkg
@@ -159,9 +162,10 @@ func parseNuGetPackage(filename string) (string, string, error) {
 // parseNpmPackage extracts name and version from an NPM package filename
 // Format: package-name-version.tgz
 func parseNpmPackage(filename string) (string, string, error) {
-	// Remove extension
-	base := strings.TrimSuffix(filename, ".tgz")
-	base = strings.TrimSuffix(base, ".tar.gz")
+	// Remove extension - case insensitive matching but preserve original case
+	base := filename
+	base = strings.TrimSuffix(strings.TrimSuffix(base, ".tgz"), ".TGZ")
+	base = strings.TrimSuffix(strings.TrimSuffix(base, ".tar.gz"), ".TAR.GZ")
 
 	// NPM packages often use format package-name-version.tgz
 	versionRegex := regexp.MustCompile(`-(\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?)$`)
@@ -180,9 +184,10 @@ func parseNpmPackage(filename string) (string, string, error) {
 // parsePythonPackage extracts name and version from a Python package filename
 // Format: package_name-version-info.whl or package_name-version.egg
 func parsePythonPackage(filename string) (string, string, error) {
-	// Remove extension
-	base := strings.TrimSuffix(filename, ".whl")
-	base = strings.TrimSuffix(base, ".egg")
+	// Remove extension - case insensitive matching but preserve original case
+	base := filename
+	base = strings.TrimSuffix(strings.TrimSuffix(base, ".whl"), ".WHL")
+	base = strings.TrimSuffix(strings.TrimSuffix(base, ".egg"), ".EGG")
 
 	// Split by first hyphen to separate name from version
 	parts := strings.SplitN(base, "-", 2)
@@ -201,8 +206,8 @@ func parsePythonPackage(filename string) (string, string, error) {
 // parseJavaPackage extracts name and version from a Java package filename
 // Format: name-version.jar or name-version-classifier.jar
 func parseJavaPackage(filename string) (string, string, error) {
-	// Remove extension
-	base := strings.TrimSuffix(filename, ".jar")
+	// Remove extension - case insensitive matching but preserve original case
+	base := strings.TrimSuffix(strings.TrimSuffix(filename, ".jar"), ".JAR")
 
 	// Try to find version pattern in the name
 	versionRegex := regexp.MustCompile(`-(\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.-]+)?)`)
@@ -220,13 +225,14 @@ func parseJavaPackage(filename string) (string, string, error) {
 
 // parseGenericPackage attempts to extract name and version using common patterns
 func parseGenericPackage(filename string) (string, string, error) {
-	// Remove extension
-	lastDot := strings.LastIndex(filename, ".")
-	if lastDot < 0 {
+	// Case insensitive extension matching but preserve original filename case
+	lastDotLower := strings.LastIndex(strings.ToLower(filename), ".")
+	if lastDotLower < 0 {
 		return "", "", fmt.Errorf("filename has no extension: %s", filename)
 	}
 
-	base := filename[:lastDot]
+	// Preserve the original case of the name portion
+	base := filename[:lastDotLower]
 
 	// Try common separators and patterns
 	separators := []string{"-", "_", "."}
@@ -265,5 +271,23 @@ func determineEcosystem(extension string) string {
 		return "RPM"
 	default:
 		return "Unknown"
+	}
+}
+
+// logCaseSensitivityWarning logs warnings about case-sensitive package ecosystems
+func logCaseSensitivityWarning(packageName string, ecosystem string) {
+	// Certain ecosystems are known to be case-sensitive
+	caseSensitiveEcosystems := map[string]bool{
+		"npm":   true,
+		"PyPI":  true,
+		"Maven": true,
+		"Cargo": true,
+		"NuGet": true, // Adding NuGet to the list of case-sensitive ecosystems
+	}
+
+	if caseSensitiveEcosystems[ecosystem] &&
+		(strings.ToLower(packageName) != packageName && strings.ToUpper(packageName) != packageName) {
+		fmt.Printf("Note: %s ecosystem is case-sensitive. Using extracted package name: %s\n",
+			ecosystem, packageName)
 	}
 }

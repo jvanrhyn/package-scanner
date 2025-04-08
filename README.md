@@ -78,6 +78,14 @@ DB_NAME=package_scanner
 DB_SSL_MODE=disable
 ```
 
+### API Configuration
+
+You can optionally override the OSV API URL:
+
+```
+OSV_API_URL=https://api.osv.dev/v1/query
+```
+
 ### Database Setup
 
 Package Scanner will automatically create the necessary tables on first run. Ensure your PostgreSQL user has sufficient privileges to create tables.
@@ -138,15 +146,21 @@ To scan a directory for package files:
 | `--db-name` | PostgreSQL database name | From `.env` or "package_scanner" |
 | `--db-sslmode` | PostgreSQL SSL mode | From `.env` or "disable" |
 
+#### API Parameters
+
+| Flag | Description | Default/Source |
+|------|-------------|---------------|
+| `--osv-api` | OSV API URL | From `.env` or "https://api.osv.dev/v1/query" |
+
 ## Example Outputs
 
 ### Vulnerability Found
 
 ```
-Querying OSV API for:
-  Package: Microsoft.AspNetCore.Identity
-  Version: 2.3.0
-  Ecosystem: NuGet
+Info: Querying OSV API for:
+Info:   Package: Microsoft.AspNetCore.Identity
+Info:   Version: 2.3.0
+Info:   Ecosystem: NuGet
 Found 1 vulnerabilities:
 1. ID: GHSA-2865-hh9g-w894
    Summary: Microsoft Security Advisory CVE-2025-24070: .NET Elevation of Privilege Vulnerability
@@ -154,34 +168,54 @@ Found 1 vulnerabilities:
    Severity Rating: 7.0-8.9/10
    Fix Version: 2.3.1
    ---
-Raw API response written to api_response.json
+Info: Raw API response written to api_response.json
 ```
 
 ### No Vulnerabilities Found
 
 ```
-Querying OSV API for:
-  Package: secure-package
-  Version: 1.0.0
-  Ecosystem: npm
+Info: Querying OSV API for:
+Info:   Package: secure-package
+Info:   Version: 1.0.0
+Info:   Ecosystem: npm
 No vulnerabilities found for the specified package and version.
-Raw API response written to api_response.json
+Info: Raw API response written to api_response.json
 ```
 
 ## Project Structure
 
 ```
 .
-├── main.go                       # Main application entry point
+├── main.go                       # Main application entry point 
 ├── .env                          # Configuration environment variables
 ├── pkg/                          # Package directory
+│   ├── cli/                      # Command line interface
+│   │   └── config.go             # Configuration management
 │   ├── db/                       # Database integration
 │   │   └── postgres.go           # PostgreSQL operations
 │   ├── models/                   # Data models
 │   │   └── vulnerability.go      # Vulnerability data structures
+│   ├── osv/                      # OSV API integration
+│   │   └── client.go             # OSV API client
+│   ├── reporting/                # Output formatting
+│   │   └── console.go            # Console reporting
 │   └── scanner/                  # Package scanning utilities
+│       ├── controller.go         # Scanning orchestration
 │       └── scanner.go            # Package file scanning logic
 ```
+
+## Architecture
+
+Package Scanner follows a modular design with clear separation of concerns:
+
+1. **CLI** (`pkg/cli`) - Handles command-line arguments and environment configuration
+2. **Scanner** (`pkg/scanner`) - Core scanning functionality and orchestration
+3. **OSV** (`pkg/osv`) - Interacts with the Open Source Vulnerability API
+4. **DB** (`pkg/db`) - Manages database operations for storing scan results
+5. **Models** (`pkg/models`) - Data structures shared across the application
+6. **Reporting** (`pkg/reporting`) - Formats and displays scan results
+
+This modular architecture makes the application easier to extend and maintain.
 
 ## Database Schema
 
