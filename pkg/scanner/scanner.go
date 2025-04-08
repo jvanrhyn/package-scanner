@@ -121,42 +121,61 @@ func (ps *PackageScanner) ExtractPackageInfo(filename string) (PackageInfo, erro
 }
 
 // parseNuGetPackage extracts name and version from a NuGet package filename
-// Format: PackageName.Version.nupkg
+// Format: PackageName.Version.nupkg (where PackageName may contain periods)
 func parseNuGetPackage(filename string) (string, string, error) {
 	// Remove extension - case insensitive matching but preserve original case
 	base := strings.TrimSuffix(strings.TrimSuffix(filename, ".nupkg"), ".NUPKG")
 
-	// NuGet packages typically use format PackageName.Version.nupkg
-	// or PackageName.Version.Suffix.nupkg
-	parts := strings.Split(base, ".")
+	// NuGet packages use the format PackageName.Version.nupkg or PackageName.Version.Suffix.nupkg
+	// PackageName may contain periods (e.g., Microsoft.AspNetCore.Identity)
 
+	// Start from the end and look for a valid version pattern
+	parts := strings.Split(base, ".")
 	if len(parts) < 2 {
 		return "", "", fmt.Errorf("invalid NuGet package filename format: %s", filename)
 	}
 
-	// The last part is usually the version
-	versionIndex := len(parts) - 1
+	// Define regex for version: digits.digits[.digits][.digits][-suffix]
+	// This is a more strict version regex to avoid matching normal parts of package name
+	versionRegex := regexp.MustCompile(`^(\d+\.\d+(\.\d+)?(\.\d+)?(-[a-zA-Z0-9.-]+)?)$`)
 
-	// Check if the version part is a valid version
-	versionRegex := regexp.MustCompile(`^\d+(\.\d+)*(-[a-zA-Z0-9.-]+)?$`)
+	// Start from the end and work backwards to find the first part that looks like a version
+	// This handles multi-segment package names with periods
+	versionIndex := -1
 
-	// Try the last part first
-	if versionRegex.MatchString(parts[versionIndex]) {
-		// Version is the last part, name is everything before that
-		name := strings.Join(parts[:versionIndex], ".")
-		return name, parts[versionIndex], nil
+	for i := len(parts) - 1; i >= 0; i-- {
+		if versionRegex.MatchString(parts[i]) {
+			versionIndex = i
+			break
+		}
 	}
 
-	// If that doesn't work, try the second-to-last part
-	if len(parts) > 2 && versionRegex.MatchString(parts[versionIndex-1]) {
-		// Version is the second-to-last part, name is everything before that
-		name := strings.Join(parts[:versionIndex-1], ".")
-		return name, parts[versionIndex-1], nil
+	// If no version was found, use a fallback approach with a more lenient pattern
+	if versionIndex == -1 {
+		// Try a more lenient version pattern: just check if it starts with a number
+		lenientVersionRegex := regexp.MustCompile(`^\d+`)
+
+		for i := len(parts) - 1; i >= 0; i-- {
+			if lenientVersionRegex.MatchString(parts[i]) {
+				versionIndex = i
+				break
+			}
+		}
+
+		// If still no match, assume the last component is the version
+		if versionIndex == -1 {
+			versionIndex = len(parts) - 1
+		}
 	}
 
-	// Default: assume the last part is version, everything else is name
+	// Extract the name and version
 	name := strings.Join(parts[:versionIndex], ".")
-	return name, parts[versionIndex], nil
+	version := parts[versionIndex]
+
+	// For debugging purposes
+	fmt.Printf("Extracted package: name='%s', version='%s' from '%s'\n", name, version, filename)
+
+	return name, version, nil
 }
 
 // parseNpmPackage extracts name and version from an NPM package filename
