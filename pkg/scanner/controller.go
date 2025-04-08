@@ -1,7 +1,7 @@
 package scanner
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -15,16 +15,21 @@ import (
 type Controller struct {
 	config     *cli.Config
 	osvClient  *osv.Client
-	reporter   *reporting.ConsoleReporter
+	reporter   *reporting.Reporter
 	dbInstance *db.PostgresDB
+	logger     *slog.Logger
 }
 
 // NewController creates a new scanner controller
 func NewController(config *cli.Config) *Controller {
+	// Use the default logger
+	logger := slog.Default()
+
 	controller := &Controller{
 		config:    config,
 		osvClient: osv.NewClient(config.OSVAPI),
-		reporter:  reporting.NewConsoleReporter(),
+		reporter:  reporting.NewReporter(logger),
+		logger:    logger,
 	}
 
 	// Initialize database if needed
@@ -41,12 +46,14 @@ func NewController(config *cli.Config) *Controller {
 		var err error
 		controller.dbInstance, err = db.NewPostgresDB(dbConfig)
 		if err != nil {
-			log.Fatalf("Error connecting to PostgreSQL: %v", err)
+			logger.Error("Error connecting to PostgreSQL", "error", err)
+			os.Exit(1)
 		}
 
 		// Initialize the database schema
 		if err := controller.dbInstance.InitializeSchema(); err != nil {
-			log.Fatalf("Error initializing database schema: %v", err)
+			logger.Error("Error initializing database schema", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -72,10 +79,11 @@ func (c *Controller) Run() {
 
 // runSinglePackageScan performs a vulnerability check on a single package
 func (c *Controller) runSinglePackageScan() {
-	c.reporter.DisplayInfo("Querying OSV API for:")
-	c.reporter.DisplayInfo("  Package: %s", c.config.PackageName)
-	c.reporter.DisplayInfo("  Version: %s", c.config.PackageVersion)
-	c.reporter.DisplayInfo("  Ecosystem: %s", c.config.PackageEcosystem)
+	// Log query information with structured fields instead of format strings
+	c.logger.Info("Querying OSV API for package",
+		"name", c.config.PackageName,
+		"version", c.config.PackageVersion,
+		"ecosystem", c.config.PackageEcosystem)
 
 	results, body, err := c.osvClient.QueryPackage(
 		c.config.PackageName,
@@ -84,7 +92,8 @@ func (c *Controller) runSinglePackageScan() {
 	)
 
 	if err != nil {
-		log.Fatalf("Error checking package vulnerabilities: %v", err)
+		c.logger.Error("Error checking package vulnerabilities", "error", err)
+		os.Exit(1)
 	}
 
 	// Display results
@@ -101,20 +110,23 @@ func (c *Controller) runSinglePackageScan() {
 		)
 
 		if err != nil {
-			log.Fatalf("Error saving results to database: %v", err)
+			c.logger.Error("Error saving results to database", "error", err)
+			os.Exit(1)
 		}
 
-		c.reporter.DisplayInfo("Results successfully saved to PostgreSQL database.")
+		c.logger.Info("Results saved to database",
+			"packageName", c.config.PackageName,
+			"vulnerabilitiesCount", len(results.Vulnerabilities))
 	} else if c.config.UseDB && len(results.Vulnerabilities) == 0 {
-		c.reporter.DisplayInfo("No vulnerabilities found. Nothing saved to database.")
+		c.logger.Info("No vulnerabilities found. Nothing saved to database.")
 	}
 
 	// Write raw response to file
 	err = os.WriteFile("api_response.json", body, 0644)
 	if err != nil {
-		c.reporter.DisplayWarning("Could not write API response to file: %v", err)
+		c.logger.Warn("Could not write API response to file", "error", err)
 	} else {
-		c.reporter.DisplayInfo("Raw API response written to api_response.json")
+		c.logger.Info("Raw API response written to api_response.json")
 	}
 }
 
@@ -122,13 +134,14 @@ func (c *Controller) runSinglePackageScan() {
 func (c *Controller) runDirectoryScan() {
 	c.reporter.DisplayDirectoryScanStart(c.config.DirectoryPath, c.config.FileExtension)
 
-	// Create scanner
-	packageScanner := NewPackageScanner(c.config.FileExtension, c.config.PackageEcosystem)
+	// Create scanner with the logger
+	packageScanner := NewPackageScanner(c.config.FileExtension, c.config.PackageEcosystem, c.logger)
 
 	// Scan directory
 	packages, err := packageScanner.ScanDirectory(c.config.DirectoryPath)
 	if err != nil {
-		log.Fatalf("Error scanning directory: %v", err)
+		c.logger.Error("Error scanning directory", "error", err)
+		os.Exit(1)
 	}
 
 	c.reporter.DisplayPackagesFound(len(packages))

@@ -3,6 +3,7 @@ package scanner
 import (
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,10 +21,11 @@ type PackageInfo struct {
 type PackageScanner struct {
 	FileExtension string
 	Ecosystem     string
+	logger        *slog.Logger
 }
 
 // NewPackageScanner creates a new package scanner
-func NewPackageScanner(extension string, ecosystem string) *PackageScanner {
+func NewPackageScanner(extension string, ecosystem string, logger *slog.Logger) *PackageScanner {
 	// Remove leading dot if present in the extension
 	extension = strings.TrimPrefix(extension, ".")
 
@@ -32,9 +34,15 @@ func NewPackageScanner(extension string, ecosystem string) *PackageScanner {
 		ecosystem = determineEcosystem(extension)
 	}
 
+	// Use default logger if none provided
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return &PackageScanner{
 		FileExtension: extension,
 		Ecosystem:     ecosystem,
+		logger:        logger,
 	}
 }
 
@@ -71,12 +79,14 @@ func (ps *PackageScanner) ScanDirectory(dirPath string) ([]PackageInfo, error) {
 		// Extract package info from filename - preserve original case
 		pkg, err := ps.ExtractPackageInfo(d.Name())
 		if err != nil {
-			fmt.Printf("Warning: Could not parse package information from %s: %v\n", d.Name(), err)
+			ps.logger.Warn("Could not parse package information",
+				"filename", d.Name(),
+				"error", err)
 			return nil
 		}
 
 		// Add additional case sensitivity warning if applicable
-		logCaseSensitivityWarning(pkg.Name, pkg.Ecosystem)
+		ps.logCaseSensitivityWarning(pkg.Name, pkg.Ecosystem)
 
 		packages = append(packages, pkg)
 		return nil
@@ -123,6 +133,8 @@ func (ps *PackageScanner) ExtractPackageInfo(filename string) (PackageInfo, erro
 // parseNuGetPackage extracts name and version from a NuGet package filename
 // Format: PackageName.Version.nupkg (where PackageName may contain periods)
 func parseNuGetPackage(filename string) (string, string, error) {
+	logger := slog.Default()
+
 	// Remove extension - case insensitive matching but preserve original case
 	base := strings.TrimSuffix(strings.TrimSuffix(filename, ".nupkg"), ".NUPKG")
 
@@ -176,8 +188,11 @@ func parseNuGetPackage(filename string) (string, string, error) {
 	name := strings.Join(parts[:versionStartIndex], ".")
 	version := strings.Join(parts[versionStartIndex:], ".")
 
-	// For debugging purposes
-	fmt.Printf("Extracted package: name='%s', version='%s' from '%s'\n", name, version, filename)
+	// Log package extraction details at debug level
+	logger.Debug("Extracted package details",
+		"name", name,
+		"version", version,
+		"filename", filename)
 
 	return name, version, nil
 }
@@ -298,7 +313,7 @@ func determineEcosystem(extension string) string {
 }
 
 // logCaseSensitivityWarning logs warnings about case-sensitive package ecosystems
-func logCaseSensitivityWarning(packageName string, ecosystem string) {
+func (ps *PackageScanner) logCaseSensitivityWarning(packageName string, ecosystem string) {
 	// Certain ecosystems are known to be case-sensitive
 	caseSensitiveEcosystems := map[string]bool{
 		"npm":   true,
@@ -310,7 +325,8 @@ func logCaseSensitivityWarning(packageName string, ecosystem string) {
 
 	if caseSensitiveEcosystems[ecosystem] &&
 		(strings.ToLower(packageName) != packageName && strings.ToUpper(packageName) != packageName) {
-		fmt.Printf("Note: %s ecosystem is case-sensitive. Using extracted package name: %s\n",
-			ecosystem, packageName)
+		ps.logger.Warn("Case-sensitive package ecosystem",
+			"ecosystem", ecosystem,
+			"packageName", packageName)
 	}
 }

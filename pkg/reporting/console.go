@@ -2,74 +2,151 @@ package reporting
 
 import (
 	"fmt"
+	"log/slog"
+	"strings"
 
 	"github.com/squarehole/package-scanner/pkg/models"
 	"github.com/squarehole/package-scanner/pkg/osv"
 )
 
-// ConsoleReporter handles reporting vulnerability scan results to the console
-type ConsoleReporter struct{}
-
-// NewConsoleReporter creates a new console reporter
-func NewConsoleReporter() *ConsoleReporter {
-	return &ConsoleReporter{}
+// Reporter handles reporting vulnerability scan results
+type Reporter struct {
+	logger *slog.Logger
 }
 
-// DisplayResults displays the vulnerability results to the console
-func (r *ConsoleReporter) DisplayResults(results models.ScanResults, packageName string) {
+// NewReporter creates a new reporter with structured logging
+func NewReporter(logger *slog.Logger) *Reporter {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Reporter{
+		logger: logger,
+	}
+}
+
+// DisplayResults displays the vulnerability results
+func (r *Reporter) DisplayResults(results models.ScanResults, packageName string) {
 	if len(results.Vulnerabilities) == 0 {
-		fmt.Println("No vulnerabilities found for the specified package and version.")
+		r.logger.Info("No vulnerabilities found for the specified package and version.")
 	} else {
-		fmt.Printf("Found %d vulnerabilities:\n", len(results.Vulnerabilities))
+		r.logger.Info("Vulnerabilities found", "count", len(results.Vulnerabilities))
+
 		for i, vuln := range results.Vulnerabilities {
-			fmt.Printf("%d. ID: %s\n", i+1, vuln.ID)
-			fmt.Printf("   Summary: %s\n", vuln.Summary)
-			fmt.Printf("   Published: %s\n", vuln.Published)
-
-			// Add severity rating
+			// Extract severity rating and fix version
 			severityRating := osv.GetSeverityRating(vuln)
-			fmt.Printf("   Severity Rating: %s\n", severityRating)
-
-			// Find fix version for the queried package
 			fixVersion := osv.FindFixVersion(vuln, packageName)
-			fmt.Printf("   Fix Version: %s\n", fixVersion)
 
-			fmt.Println("   ---")
+			// Log each vulnerability as a structured log entry
+			r.logger.Info("Vulnerability details",
+				"index", i+1,
+				"id", vuln.ID,
+				"summary", vuln.Summary,
+				"published", vuln.Published,
+				"severity", severityRating,
+				"fixVersion", fixVersion,
+			)
 		}
 	}
 }
 
 // DisplayScanSummary displays a summary of the scan operation
-func (r *ConsoleReporter) DisplayScanSummary(packageCount int) {
-	fmt.Printf("Scan completed. Processed %d packages.\n", packageCount)
+func (r *Reporter) DisplayScanSummary(packageCount int) {
+	r.logger.Info("Scan completed", "packagesProcessed", packageCount)
 }
 
 // DisplayPackageScanStart displays information about scanning a package
-func (r *ConsoleReporter) DisplayPackageScanStart(name, version, ecosystem string) {
-	fmt.Printf("Checking %s@%s (%s)...\n", name, version, ecosystem)
+func (r *Reporter) DisplayPackageScanStart(name, version, ecosystem string) {
+	r.logger.Info("Scanning package",
+		"name", name,
+		"version", version,
+		"ecosystem", ecosystem,
+	)
 }
 
 // DisplayDirectoryScanStart displays information about starting a directory scan
-func (r *ConsoleReporter) DisplayDirectoryScanStart(dirPath, fileExt string) {
-	fmt.Printf("Scanning directory %s for %s files...\n", dirPath, fileExt)
+func (r *Reporter) DisplayDirectoryScanStart(dirPath, fileExt string) {
+	r.logger.Info("Scanning directory",
+		"path", dirPath,
+		"fileExtension", fileExt,
+	)
 }
 
 // DisplayPackagesFound displays information about found packages
-func (r *ConsoleReporter) DisplayPackagesFound(count int) {
-	fmt.Printf("Found %d package files to scan.\n", count)
+func (r *Reporter) DisplayPackagesFound(count int) {
+	r.logger.Info("Package files found", "count", count)
 }
 
 // DisplayError displays an error message
-func (r *ConsoleReporter) DisplayError(format string, args ...interface{}) {
-	fmt.Printf("Error: "+format+"\n", args...)
+func (r *Reporter) DisplayError(format string, args ...interface{}) {
+	// Check if this is a printf-style message that needs formatting
+	if len(args) > 0 && (strings.Contains(format, "%s") ||
+		strings.Contains(format, "%d") ||
+		strings.Contains(format, "%v")) {
+		// This is a printf-style format string, format it properly
+		formattedMsg := fmt.Sprintf(format, args...)
+		r.logger.Error(formattedMsg)
+	} else if len(args) > 0 {
+		// Non-format string with attributes for structured logging
+		// Build key-value pairs for structured logging
+		keyVals := make([]any, 0, len(args)*2)
+		for i := 0; i < len(args); i++ {
+			// Create a default key name if needed
+			key := fmt.Sprintf("param%d", i)
+			keyVals = append(keyVals, key, args[i])
+		}
+		r.logger.Error(format, keyVals...)
+	} else {
+		// Simple message with no args
+		r.logger.Error(format)
+	}
 }
 
 // DisplayWarning displays a warning message
-func (r *ConsoleReporter) DisplayWarning(format string, args ...interface{}) {
-	fmt.Printf("Warning: "+format+"\n", args...)
+func (r *Reporter) DisplayWarning(format string, args ...interface{}) {
+	// Check if this is a printf-style message that needs formatting
+	if len(args) > 0 && (strings.Contains(format, "%s") ||
+		strings.Contains(format, "%d") ||
+		strings.Contains(format, "%v")) {
+		// This is a printf-style format string, format it properly
+		formattedMsg := fmt.Sprintf(format, args...)
+		r.logger.Warn(formattedMsg)
+	} else if len(args) > 0 {
+		// Non-format string with attributes for structured logging
+		// Build key-value pairs for structured logging
+		keyVals := make([]any, 0, len(args)*2)
+		for i := 0; i < len(args); i++ {
+			// Create a default key name if needed
+			key := fmt.Sprintf("param%d", i)
+			keyVals = append(keyVals, key, args[i])
+		}
+		r.logger.Warn(format, keyVals...)
+	} else {
+		// Simple message with no args
+		r.logger.Warn(format)
+	}
 }
 
 // DisplayInfo displays an information message
-func (r *ConsoleReporter) DisplayInfo(format string, args ...interface{}) {
-	fmt.Printf("Info: "+format+"\n", args...)
+func (r *Reporter) DisplayInfo(format string, args ...interface{}) {
+	// Check if this is a printf-style message that needs formatting
+	if len(args) > 0 && (strings.Contains(format, "%s") ||
+		strings.Contains(format, "%d") ||
+		strings.Contains(format, "%v")) {
+		// This is a printf-style format string, format it properly
+		formattedMsg := fmt.Sprintf(format, args...)
+		r.logger.Info(formattedMsg)
+	} else if len(args) > 0 {
+		// Non-format string with attributes for structured logging
+		// Build key-value pairs for structured logging
+		keyVals := make([]any, 0, len(args)*2)
+		for i := 0; i < len(args); i++ {
+			// Create a default key name if needed
+			key := fmt.Sprintf("param%d", i)
+			keyVals = append(keyVals, key, args[i])
+		}
+		r.logger.Info(format, keyVals...)
+	} else {
+		// Simple message with no args
+		r.logger.Info(format)
+	}
 }
