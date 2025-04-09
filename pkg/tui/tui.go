@@ -133,6 +133,7 @@ var (
 	errorMessageStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true)
 	helpStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	sectionStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FAFAFA")).Background(lipgloss.Color("#3B3B98")).Padding(0, 1)
+	labelStyle         = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FAFAFA"))
 )
 
 // NewModel creates a new TUI model with default values
@@ -595,16 +596,28 @@ func (m Model) View() string {
 	if m.showAdvanced {
 		// Database section
 		s += "\n" + sectionStyle.Render(" Database Configuration ") + "\n\n"
+
+		// Define labels for database fields
+		dbLabels := []string{"Host:", "Port:", "User:", "Password:", "Database Name:", "SSL Mode:"}
+
+		// Add database inputs with descriptive labels
 		for i, input := range m.dbInputs {
-			label := fmt.Sprintf("%d. ", i+len(m.inputs)+1)
-			s += label + input.View() + "\n"
+			if i < len(dbLabels) {
+				s += labelStyle.Render(fmt.Sprintf("%-15s", dbLabels[i])) + " " + input.View() + "\n"
+			}
 		}
 
 		// Logging section
 		s += "\n" + sectionStyle.Render(" Logging Configuration ") + "\n\n"
+
+		// Define labels for logging fields
+		logLabels := []string{"Log File Path:", "Max Size (MB):", "Max Backups:", "Max Age (days):", "Log Level:"}
+
+		// Add logging inputs with descriptive labels
 		for i, input := range m.logInputs {
-			label := fmt.Sprintf("%d. ", i+len(m.inputs)+len(m.dbInputs)+1)
-			s += label + input.View() + "\n"
+			if i < len(logLabels) {
+				s += labelStyle.Render(fmt.Sprintf("%-15s", logLabels[i])) + " " + input.View() + "\n"
+			}
 		}
 	} else {
 		s += "\n" + statusMessageStyle.Render("Press Ctrl+O to show advanced options") + "\n"
@@ -625,14 +638,28 @@ func renderInputGroup(m Model) string {
 	// Add section header based on mode
 	if m.config.Mode == SinglePackageMode {
 		s += sectionStyle.Render(" Package Details ") + "\n\n"
+
+		// Define labels for single package mode
+		labels := []string{"Package Name:", "Version:", "Ecosystem:"}
+
+		// Add inputs with descriptive labels
+		for i, input := range m.inputs {
+			if i < len(labels) {
+				s += labelStyle.Render(fmt.Sprintf("%-15s", labels[i])) + " " + input.View() + "\n"
+			}
+		}
 	} else {
 		s += sectionStyle.Render(" Directory Scan ") + "\n\n"
-	}
 
-	// Add inputs
-	for i, input := range m.inputs {
-		label := fmt.Sprintf("%d. ", i+1)
-		s += label + input.View() + "\n"
+		// Define labels for directory scan mode
+		labels := []string{"Directory Path:", "File Extension:", "Concurrency:"}
+
+		// Add inputs with descriptive labels
+		for i, input := range m.inputs {
+			if i < len(labels) {
+				s += labelStyle.Render(fmt.Sprintf("%-15s", labels[i])) + " " + input.View() + "\n"
+			}
+		}
 	}
 
 	return s
