@@ -38,6 +38,7 @@ type Config struct {
 	LogMaxAge     int
 	LogCompress   bool
 	LogLevel      string
+	LogFormat     string
 }
 
 // NewConfig creates a new configuration by parsing command-line flags
@@ -75,6 +76,7 @@ func NewConfig() *Config {
 	logMaxAge := flag.Int("log-max-age", getEnvIntWithDefault("LOG_MAX_AGE", 30), "Maximum age of log files in days")
 	logCompress := flag.Bool("log-compress", getEnvBoolWithDefault("LOG_COMPRESS", true), "Whether to compress rotated logs")
 	logLevel := flag.String("log-level", getEnvWithDefault("LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+	logFormat := flag.String("log-format", getEnvWithDefault("LOG_FORMAT", "json"), "Log format (json, text)")
 
 	// Parse command line flags
 	flag.Parse()
@@ -101,6 +103,7 @@ func NewConfig() *Config {
 	config.LogMaxAge = *logMaxAge
 	config.LogCompress = *logCompress
 	config.LogLevel = *logLevel
+	config.LogFormat = *logFormat
 
 	return config
 }

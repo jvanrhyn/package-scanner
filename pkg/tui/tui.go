@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -51,6 +52,7 @@ type AppConfig struct {
 	LogMaxAge     int
 	LogCompress   bool
 	LogLevel      string
+	LogFormat     string
 }
 
 // keyMap defines the keybindings for the application
@@ -138,29 +140,60 @@ var (
 
 // NewModel creates a new TUI model with default values
 func NewModel() Model {
+	// Read environment variables for default settings
+	logFormat := os.Getenv("LOG_FORMAT")
+	if logFormat == "" {
+		logFormat = "json" // Default to JSON if not specified
+	}
+
+	// Read other environment variables with defaults
+	logLevel := getEnvWithDefault("LOG_LEVEL", "info")
+	logFilePath := getEnvWithDefault("LOG_FILE_PATH", "logs/package-scanner.log")
+	logMaxSize, _ := strconv.Atoi(getEnvWithDefault("LOG_MAX_SIZE", "10"))
+	logMaxBackups, _ := strconv.Atoi(getEnvWithDefault("LOG_MAX_BACKUPS", "5"))
+	logMaxAge, _ := strconv.Atoi(getEnvWithDefault("LOG_MAX_AGE", "30"))
+
+	// Database defaults
+	dbHost := getEnvWithDefault("DB_HOST", "localhost")
+	dbPortStr := getEnvWithDefault("DB_PORT", "5432")
+	dbPort, _ := strconv.Atoi(dbPortStr)
+	dbUser := getEnvWithDefault("DB_USER", "postgres")
+	dbPassword := getEnvWithDefault("DB_PASSWORD", "")
+	dbName := getEnvWithDefault("DB_NAME", "package_scanner")
+	dbSSLMode := getEnvWithDefault("DB_SSL_MODE", "disable")
+
+	// Other defaults
+	packageName := getEnvWithDefault("PACKAGE_NAME", "Microsoft.AspNetCore.Identity")
+	packageVersion := getEnvWithDefault("PACKAGE_VERSION", "2.3.0")
+	packageEcosystem := getEnvWithDefault("PACKAGE_ECOSYSTEM", "NuGet")
+	directoryPath := getEnvWithDefault("DIRECTORY_PATH", "./packages")
+	fileExtension := getEnvWithDefault("FILE_EXTENSION", "nupkg")
+	concurrency, _ := strconv.Atoi(getEnvWithDefault("CONCURRENCY", "5"))
+
 	m := Model{
 		config: AppConfig{
 			Mode:             SinglePackageMode,
-			PackageName:      "Microsoft.AspNetCore.Identity",
-			PackageVersion:   "2.3.0",
-			PackageEcosystem: "NuGet",
-			DirectoryPath:    "./packages",
-			FileExtension:    "nupkg",
-			Concurrency:      5,
+			PackageName:      packageName,
+			PackageVersion:   packageVersion,
+			PackageEcosystem: packageEcosystem,
+			DirectoryPath:    directoryPath,
+			FileExtension:    fileExtension,
+			Concurrency:      concurrency,
 			UseDB:            false,
-			DBHost:           "localhost",
-			DBPort:           5432,
-			DBUser:           "postgres",
-			DBPassword:       "",
-			DBName:           "package_scanner",
-			DBSSLMode:        "disable",
+			DBHost:           dbHost,
+			DBPort:           dbPort,
+			DBUser:           dbUser,
+			DBPassword:       dbPassword,
+			DBName:           dbName,
+			DBSSLMode:        dbSSLMode,
 			LogToFile:        true,
-			LogFilePath:      "logs/package-scanner.log",
-			LogMaxSize:       10,
-			LogMaxBackups:    5,
-			LogMaxAge:        30,
+			LogFilePath:      logFilePath,
+			LogMaxSize:       logMaxSize,
+			LogMaxBackups:    logMaxBackups,
+			LogMaxAge:        logMaxAge,
 			LogCompress:      true,
-			LogLevel:         "info",
+			LogLevel:         logLevel,
+			LogFormat:        logFormat,
 		},
 		keys:         defaultKeyMap(),
 		help:         help.New(),
@@ -172,6 +205,14 @@ func NewModel() Model {
 	m.initializeInputs()
 
 	return m
+}
+
+// getEnvWithDefault reads an environment variable and returns a default value if not set
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 // RunTUI starts the TUI application
@@ -243,6 +284,7 @@ func (m *Model) initializeInputs() {
 		{placeholder: "Max Backups", value: fmt.Sprintf("%d", m.config.LogMaxBackups), label: "Max Backups"},
 		{placeholder: "Max Age (days)", value: fmt.Sprintf("%d", m.config.LogMaxAge), label: "Max Age"},
 		{placeholder: "Log Level (debug, info, warn, error)", value: m.config.LogLevel, label: "Log Level"},
+		{placeholder: "Log Format (json, text)", value: m.config.LogFormat, label: "Log Format"},
 	}
 
 	// Initialize single package inputs
@@ -544,7 +586,7 @@ func (m *Model) updateConfig() {
 		}
 
 		// Update log config
-		if len(m.logInputs) >= 5 {
+		if len(m.logInputs) >= 6 {
 			m.config.LogToFile = true
 			m.config.LogFilePath = m.logInputs[0].Value()
 			if size, err := strconv.Atoi(m.logInputs[1].Value()); err == nil {
@@ -557,6 +599,7 @@ func (m *Model) updateConfig() {
 				m.config.LogMaxAge = age
 			}
 			m.config.LogLevel = m.logInputs[4].Value()
+			m.config.LogFormat = m.logInputs[5].Value()
 		}
 	} else {
 		// If not showing advanced options, disable DB usage
@@ -611,7 +654,7 @@ func (m Model) View() string {
 		s += "\n" + sectionStyle.Render(" Logging Configuration ") + "\n\n"
 
 		// Define labels for logging fields
-		logLabels := []string{"Log File Path:", "Max Size (MB):", "Max Backups:", "Max Age (days):", "Log Level:"}
+		logLabels := []string{"Log File Path:", "Max Size (MB):", "Max Backups:", "Max Age (days):", "Log Level:", "Log Format:"}
 
 		// Add logging inputs with descriptive labels
 		for i, input := range m.logInputs {

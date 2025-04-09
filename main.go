@@ -52,6 +52,7 @@ func main() {
 		MaxAge:      config.LogMaxAge,
 		Compress:    config.LogCompress,
 		Level:       parseLogLevel(config.LogLevel),
+		Format:      logging.ParseLogFormat(config.LogFormat),
 	}
 
 	logger, err := logging.SetupLogger(logConfig)
@@ -86,6 +87,7 @@ func convertTUIConfigToCLIConfig(tuiConfig *tui.AppConfig) *cli.Config {
 		LogMaxAge:     tuiConfig.LogMaxAge,
 		LogCompress:   tuiConfig.LogCompress,
 		LogLevel:      tuiConfig.LogLevel,
+		LogFormat:     tuiConfig.LogFormat,
 	}
 
 	// Mode-specific fields

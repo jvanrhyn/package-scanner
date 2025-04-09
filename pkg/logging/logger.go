@@ -5,8 +5,19 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/natefinch/lumberjack.v2"
+)
+
+// LogFormat defines the logging format
+type LogFormat string
+
+const (
+	// JSONFormat represents structured JSON logging format
+	JSONFormat LogFormat = "json"
+	// TextFormat represents human-readable text logging format
+	TextFormat LogFormat = "text"
 )
 
 // LogConfig represents configuration options for logging
@@ -25,6 +36,8 @@ type LogConfig struct {
 	Compress bool
 	// Minimum log level
 	Level slog.Level
+	// Logging format (json or text)
+	Format LogFormat
 }
 
 // DefaultConfig returns the default logging configuration
@@ -37,7 +50,18 @@ func DefaultConfig() LogConfig {
 		MaxAge:      30, // 30 days
 		Compress:    true,
 		Level:       slog.LevelInfo,
+		Format:      JSONFormat,
 	}
+}
+
+// ParseLogFormat converts a string to LogFormat
+func ParseLogFormat(format string) LogFormat {
+	format = strings.ToLower(format)
+	if format == "text" {
+		return TextFormat
+	}
+	// Default to JSON for any other value
+	return JSONFormat
 }
 
 // SetupLogger configures the global logger with file rotation
@@ -68,14 +92,32 @@ func SetupLogger(config LogConfig) (*slog.Logger, error) {
 		writer = os.Stdout
 	}
 
-	// Create slog handler and logger
-	handler := slog.NewJSONHandler(writer, &slog.HandlerOptions{
-		Level: config.Level,
-	})
+	// Create slog handler based on format
+	var handler slog.Handler
+
+	switch config.Format {
+	case TextFormat:
+		// Use text handler for human-readable format
+		handler = slog.NewTextHandler(writer, &slog.HandlerOptions{
+			Level: config.Level,
+		})
+	default:
+		// Use JSON handler (default)
+		handler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
+			Level: config.Level,
+		})
+	}
+
 	logger := slog.New(handler)
 
 	// Set as default logger
 	slog.SetDefault(logger)
+
+	// Log the format we're using
+	logger.Info("Logger initialized",
+		"format", string(config.Format),
+		"level", config.Level.String(),
+		"toFile", config.LogToFile)
 
 	return logger, nil
 }
