@@ -29,6 +29,15 @@ type Config struct {
 
 	// API options
 	OSVAPI string
+
+	// Logging options
+	LogToFile     bool
+	LogFilePath   string
+	LogMaxSize    int
+	LogMaxBackups int
+	LogMaxAge     int
+	LogCompress   bool
+	LogLevel      string
 }
 
 // NewConfig creates a new configuration by parsing command-line flags
@@ -58,6 +67,15 @@ func NewConfig() *Config {
 	// API options
 	osvAPI := flag.String("osv-api", getEnvWithDefault("OSV_API_URL", "https://api.osv.dev/v1/query"), "OSV API URL")
 
+	// Logging options
+	logToFile := flag.Bool("log-to-file", getEnvBoolWithDefault("LOG_TO_FILE", true), "Whether to log to file (in addition to stdout)")
+	logFilePath := flag.String("log-file", getEnvWithDefault("LOG_FILE_PATH", "logs/package-scanner.log"), "Log file path")
+	logMaxSize := flag.Int("log-max-size", getEnvIntWithDefault("LOG_MAX_SIZE", 10), "Maximum size of log file in MB before rotation")
+	logMaxBackups := flag.Int("log-max-backups", getEnvIntWithDefault("LOG_MAX_BACKUPS", 5), "Maximum number of log files to keep")
+	logMaxAge := flag.Int("log-max-age", getEnvIntWithDefault("LOG_MAX_AGE", 30), "Maximum age of log files in days")
+	logCompress := flag.Bool("log-compress", getEnvBoolWithDefault("LOG_COMPRESS", true), "Whether to compress rotated logs")
+	logLevel := flag.String("log-level", getEnvWithDefault("LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
+
 	// Parse command line flags
 	flag.Parse()
 
@@ -76,6 +94,13 @@ func NewConfig() *Config {
 	config.DBSSLMode = *dbSSLMode
 	config.UseDB = *useDb
 	config.OSVAPI = *osvAPI
+	config.LogToFile = *logToFile
+	config.LogFilePath = *logFilePath
+	config.LogMaxSize = *logMaxSize
+	config.LogMaxBackups = *logMaxBackups
+	config.LogMaxAge = *logMaxAge
+	config.LogCompress = *logCompress
+	config.LogLevel = *logLevel
 
 	return config
 }
@@ -96,6 +121,19 @@ func getEnvIntWithDefault(key string, defaultValue int) int {
 		return defaultValue
 	}
 	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+// getEnvBoolWithDefault gets an environment variable as a bool or returns a default value if not set
+func getEnvBoolWithDefault(key string, defaultValue bool) bool {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
 		return defaultValue
 	}

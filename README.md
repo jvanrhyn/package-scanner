@@ -4,12 +4,13 @@ A vulnerability scanning tool for software packages that uses the OSV (Open Sour
 
 ## Overview
 
-Package Scanner is a Go-based command-line utility that scans software packages for known security vulnerabilities. It can query the OSV API for specific package versions or scan directories of package files (such as `.nupkg`, `.tgz`, etc.), automatically extracting package name and version information from filenames.
+Package Scanner is a Go-based utility that scans software packages for known security vulnerabilities. It can query the OSV API for specific package versions or scan directories of package files (such as `.nupkg`, `.tgz`, etc.), automatically extracting package name and version information from filenames.
 
-Results can be displayed to the console and optionally stored in a PostgreSQL database for historical tracking and analysis.
+The application can be used through an interactive terminal user interface (TUI) or via command-line arguments. Results can be displayed to the console and optionally stored in a PostgreSQL database for historical tracking and analysis.
 
 ## Features
 
+- Interactive Terminal User Interface (TUI) for easy parameter entry
 - Query vulnerabilities for specific package versions
 - Scan directories for package files with automatic package data extraction
 - Parallel processing of multiple packages
@@ -26,6 +27,7 @@ Results can be displayed to the console and optionally stored in a PostgreSQL da
 - PostgreSQL database integration for storing vulnerability results
 - Environment variable configuration via `.env` files
 - Smart package name and version extraction from filenames
+- Structured logging with log rotation
 
 ## Requirements
 
@@ -51,6 +53,7 @@ Package Scanner uses the following external dependencies:
 
 - `github.com/lib/pq` - PostgreSQL driver
 - `github.com/joho/godotenv` - Environment variable loading from .env files
+- `gopkg.in/natefinch/lumberjack.v2` - Log rotation and management
 
 To install dependencies:
 
@@ -87,6 +90,27 @@ You can optionally override the OSV API URL:
 OSV_API_URL=https://api.osv.dev/v1/query
 ```
 
+### Logging Configuration
+
+The application can log to both the console and a rotating log file. Configure logging with:
+
+```
+# Control whether to write logs to file (in addition to stdout)
+LOG_TO_FILE=true
+# Path to log file
+LOG_FILE_PATH=logs/package-scanner.log
+# Maximum size of log file in MB before rotation
+LOG_MAX_SIZE=10
+# Maximum number of old log files to retain
+LOG_MAX_BACKUPS=5
+# Maximum age of log files in days
+LOG_MAX_AGE=30
+# Whether to compress old log files
+LOG_COMPRESS=true
+# Minimum log level (debug, info, warn, error)
+LOG_LEVEL=info
+```
+
 ### Database Setup
 
 Package Scanner will automatically create the necessary tables on first run. Ensure your PostgreSQL user has sufficient privileges to create tables.
@@ -94,6 +118,23 @@ Package Scanner will automatically create the necessary tables on first run. Ens
 **Note:** The application only saves results to the database when vulnerabilities are found. This keeps your database clean and focused on actual security issues.
 
 ## Usage
+
+### Interactive TUI Mode
+
+To start the application in interactive Terminal User Interface mode, simply run the application with no arguments:
+
+```bash
+./package-scanner
+```
+
+This will launch a user-friendly interface where you can:
+- Toggle between single package scan and directory scan modes (Ctrl+T)
+- Enter all relevant scan parameters through form fields
+- Navigate between fields (Tab/Shift+Tab)
+- Access advanced options for database and logging configuration (Ctrl+O)
+- Submit the form to start scanning (Enter)
+
+![TUI Screenshot](https://example.com/package-scanner-tui.png)
 
 ### Single Package Scan
 
@@ -155,37 +196,33 @@ To scan a directory for package files:
 |------|-------------|---------------|
 | `--osv-api` | OSV API URL | From `.env` or "https://api.osv.dev/v1/query" |
 
+#### Logging Parameters
+
+| Flag | Description | Default/Source |
+|------|-------------|---------------|
+| `--log-to-file` | Whether to log to file (in addition to stdout) | From `.env` or "true" |
+| `--log-file` | Log file path | From `.env` or "logs/package-scanner.log" |
+| `--log-max-size` | Maximum size of log file in MB before rotation | From `.env` or 10 |
+| `--log-max-backups` | Maximum number of old log files to retain | From `.env` or 5 |
+| `--log-max-age` | Maximum age of log files in days | From `.env` or 30 |
+| `--log-compress` | Whether to compress old log files | From `.env` or "true" |
+| `--log-level` | Minimum log level (debug, info, warn, error) | From `.env` or "info" |
+
 ## Example Outputs
 
-### Vulnerability Found
-
-```
-Info: Querying OSV API for:
-Info:   Package: Microsoft.AspNetCore.Identity
-Info:   Version: 2.3.0
-Info:   Ecosystem: NuGet
-Found 1 vulnerabilities:
-1. ID: GHSA-2865-hh9g-w894
-   Summary: Microsoft Security Advisory CVE-2025-24070: .NET Elevation of Privilege Vulnerability
-   Published: 2025-03-11 19:24:11 +0000 UTC
-   Severity Rating: 7.0-8.9/10
-   Fix Version: 2.3.1
-   ---
-Info: Results successfully saved to PostgreSQL database.
-Info: Raw API response written to api_response.json
+### Console Output (JSON structured logging)
+```json
+{"time":"2025-04-08T10:45:22.123Z","level":"INFO","msg":"Package Scanner starting","version":"1.0.0"}
+{"time":"2025-04-08T10:45:22.234Z","level":"INFO","msg":"Scanning package","name":"Microsoft.AspNetCore.Identity","version":"2.3.0","ecosystem":"NuGet"}
+{"time":"2025-04-08T10:45:23.345Z","level":"INFO","msg":"Vulnerabilities found","count":1}
+{"time":"2025-04-08T10:45:23.456Z","level":"INFO","msg":"Vulnerability details","index":1,"id":"GHSA-2865-hh9g-w894","summary":"Microsoft Security Advisory CVE-2025-24070","published":"2025-03-11T19:24:11Z","severity":"7.0-8.9/10","fixVersion":"2.3.1"}
+{"time":"2025-04-08T10:45:23.567Z","level":"INFO","msg":"Results successfully saved to PostgreSQL database."}
+{"time":"2025-04-08T10:45:23.678Z","level":"INFO","msg":"Raw API response written to api_response.json"}
 ```
 
-### No Vulnerabilities Found
+### Log File Output
 
-```
-Info: Querying OSV API for:
-Info:   Package: secure-package
-Info:   Version: 1.0.0
-Info:   Ecosystem: npm
-No vulnerabilities found for the specified package and version.
-Info: No vulnerabilities found. Nothing saved to database.
-Info: Raw API response written to api_response.json
-```
+The same structured logs are written to the configured log file with automatic rotation when it reaches the configured maximum size.
 
 ## Package Name Extraction
 
@@ -209,6 +246,8 @@ If the package format is not recognized, a fallback parser attempts to extract n
 │   │   └── config.go             # Configuration management
 │   ├── db/                       # Database integration
 │   │   └── postgres.go           # PostgreSQL operations
+│   ├── logging/                  # Logging subsystem
+│   │   └── logger.go             # Structured logging with rotation
 │   ├── models/                   # Data models
 │   │   └── vulnerability.go      # Vulnerability data structures
 │   ├── osv/                      # OSV API integration
@@ -218,6 +257,8 @@ If the package format is not recognized, a fallback parser attempts to extract n
 │   └── scanner/                  # Package scanning utilities
 │       ├── controller.go         # Scanning orchestration
 │       └── scanner.go            # Package file scanning logic
+├── logs/                         # Directory for log files
+│   └── package-scanner.log       # Application logs with rotation
 ├── test/                         # Test directory
 │   └── extraction/               # Package extraction tests
 │       └── main.go               # Test code for extraction logic
@@ -233,6 +274,7 @@ Package Scanner follows a modular design with clear separation of concerns:
 4. **DB** (`pkg/db`) - Manages database operations for storing scan results
 5. **Models** (`pkg/models`) - Data structures shared across the application
 6. **Reporting** (`pkg/reporting`) - Formats and displays scan results
+7. **Logging** (`pkg/logging`) - Structured logging with file rotation
 
 This modular architecture makes the application easier to extend and maintain.
 
