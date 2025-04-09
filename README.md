@@ -109,6 +109,8 @@ LOG_MAX_AGE=30
 LOG_COMPRESS=true
 # Minimum log level (debug, info, warn, error)
 LOG_LEVEL=info
+# Format of logs (json, text)
+LOG_FORMAT=json
 ```
 
 ### Database Setup
@@ -207,6 +209,7 @@ To scan a directory for package files:
 | `--log-max-age` | Maximum age of log files in days | From `.env` or 30 |
 | `--log-compress` | Whether to compress old log files | From `.env` or "true" |
 | `--log-level` | Minimum log level (debug, info, warn, error) | From `.env` or "info" |
+| `--log-format` | Format of logs (json, text) | From `.env` or "json" |
 
 ## Example Outputs
 
