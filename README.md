@@ -4,12 +4,13 @@ A vulnerability scanning tool for software packages that uses the OSV (Open Sour
 
 ## Overview
 
-Package Scanner is a Go-based command-line utility that scans software packages for known security vulnerabilities. It can query the OSV API for specific package versions or scan directories of package files (such as `.nupkg`, `.tgz`, etc.), automatically extracting package name and version information from filenames.
+Package Scanner is a Go-based utility that scans software packages for known security vulnerabilities. It can query the OSV API for specific package versions or scan directories of package files (such as `.nupkg`, `.tgz`, etc.), automatically extracting package name and version information from filenames.
 
-Results can be displayed to the console and optionally stored in a PostgreSQL database for historical tracking and analysis.
+The application can be used through an interactive terminal user interface (TUI) or via command-line arguments. Results can be displayed to the console and optionally stored in a PostgreSQL database for historical tracking and analysis.
 
 ## Features
 
+- Interactive Terminal User Interface (TUI) for easy parameter entry
 - Query vulnerabilities for specific package versions
 - Scan directories for package files with automatic package data extraction
 - Parallel processing of multiple packages
@@ -117,6 +118,23 @@ Package Scanner will automatically create the necessary tables on first run. Ens
 **Note:** The application only saves results to the database when vulnerabilities are found. This keeps your database clean and focused on actual security issues.
 
 ## Usage
+
+### Interactive TUI Mode
+
+To start the application in interactive Terminal User Interface mode, simply run the application with no arguments:
+
+```bash
+./package-scanner
+```
+
+This will launch a user-friendly interface where you can:
+- Toggle between single package scan and directory scan modes (Ctrl+T)
+- Enter all relevant scan parameters through form fields
+- Navigate between fields (Tab/Shift+Tab)
+- Access advanced options for database and logging configuration (Ctrl+O)
+- Submit the form to start scanning (Enter)
+
+![TUI Screenshot](https://example.com/package-scanner-tui.png)
 
 ### Single Package Scan
 
