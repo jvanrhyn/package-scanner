@@ -2,13 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 
 	"github.com/squarehole/package-scanner/pkg/scanner"
 )
 
 func main() {
+	// Create a logger
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	// Create a scanner for NuGet packages
-	packageScanner := scanner.NewPackageScanner("nupkg", "NuGet")
+	packageScanner := scanner.NewPackageScanner("nupkg", "NuGet", logger)
 
 	// Test with the example filename
 	testFilenames := []string{
