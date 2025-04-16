@@ -2,6 +2,7 @@ package cli
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -63,7 +64,12 @@ func NewConfig() *Config {
 	dbPassword := flag.String("db-password", getEnvWithDefault("DB_PASSWORD", ""), "PostgreSQL database password")
 	dbName := flag.String("db-name", getEnvWithDefault("DB_NAME", "package_scanner"), "PostgreSQL database name")
 	dbSSLMode := flag.String("db-sslmode", getEnvWithDefault("DB_SSL_MODE", "disable"), "PostgreSQL SSL mode (disable, require, verify-ca, verify-full)")
-	useDb := flag.Bool("save-db", false, "Save results to PostgreSQL database")
+
+	// Debug the USE_DB value from environment
+	useDbFromEnv := os.Getenv("USE_DB")
+	fmt.Println("USE_DB environment value:", useDbFromEnv)
+
+	useDb := flag.Bool("save-db", getEnvBoolWithDefault("USE_DB", false), "Save results to PostgreSQL database")
 
 	// API options
 	osvAPI := flag.String("osv-api", getEnvWithDefault("OSV_API_URL", "https://api.osv.dev/v1/query"), "OSV API URL")
@@ -133,12 +139,19 @@ func getEnvIntWithDefault(key string, defaultValue int) int {
 // getEnvBoolWithDefault gets an environment variable as a bool or returns a default value if not set
 func getEnvBoolWithDefault(key string, defaultValue bool) bool {
 	valueStr := os.Getenv(key)
+	fmt.Printf("DEBUG: Reading environment variable %s: '%s'\n", key, valueStr)
+
 	if valueStr == "" {
+		fmt.Printf("DEBUG: Using default value for %s: %v\n", key, defaultValue)
 		return defaultValue
 	}
+
 	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
+		fmt.Printf("DEBUG: Error parsing %s as bool: %v, using default: %v\n", key, err, defaultValue)
 		return defaultValue
 	}
+
+	fmt.Printf("DEBUG: Successfully parsed %s as bool: %v\n", key, value)
 	return value
 }

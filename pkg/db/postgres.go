@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -95,6 +96,11 @@ func (p *PostgresDB) SaveVulnerabilityResults(packageName string, ecosystem stri
 	// Begin a transaction
 	tx, err := p.db.Begin()
 	if err != nil {
+		slog.Error("Failed to begin database transaction",
+			"error", err,
+			"package", packageName,
+			"ecosystem", ecosystem,
+			"version", version)
 		return err
 	}
 	defer func() {
@@ -111,28 +117,29 @@ func (p *PostgresDB) SaveVulnerabilityResults(packageName string, ecosystem stri
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`)
 	if err != nil {
+		slog.Error("Failed to prepare SQL statement",
+			"error", err,
+			"package", packageName,
+			"ecosystem", ecosystem,
+			"version", version)
 		return err
 	}
 	defer stmt.Close()
 
-	// If no vulnerabilities were found, create a single record with empty vulnerability info
+	// If no vulnerabilities were found, skip writing to the database
 	if len(vulnerabilities) == 0 {
-		// Raw response might be a JSON structure indicating no vulnerabilities
-		_, err = stmt.Exec(
-			packageName,
-			ecosystem,
-			version,
-			"", // No vulnerability ID
-			"No vulnerabilities found",
-			time.Now(),
-			"N/A",
-			"N/A",
-			rawResponse,
-		)
-		if err != nil {
-			return err
-		}
+		slog.Info("No vulnerabilities found - skipping database write",
+			"package", packageName,
+			"ecosystem", ecosystem,
+			"version", version)
+		return nil
 	} else {
+		slog.Info("Writing vulnerability results to database",
+			"package", packageName,
+			"ecosystem", ecosystem,
+			"version", version,
+			"vulnCount", len(vulnerabilities))
+
 		// For each vulnerability, create a record
 		for _, vuln := range vulnerabilities {
 			// Extract fix version
@@ -154,13 +161,35 @@ func (p *PostgresDB) SaveVulnerabilityResults(packageName string, ecosystem stri
 				rawResponse,
 			)
 			if err != nil {
+				slog.Error("Failed to insert vulnerability record",
+					"error", err,
+					"package", packageName,
+					"ecosystem", ecosystem,
+					"version", version,
+					"vulnID", vuln.ID)
 				return err
 			}
 		}
 	}
 
 	// Commit the transaction
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		slog.Error("Failed to commit transaction",
+			"error", err,
+			"package", packageName,
+			"ecosystem", ecosystem,
+			"version", version)
+		return err
+	}
+
+	slog.Info("Successfully wrote vulnerability results to database",
+		"package", packageName,
+		"ecosystem", ecosystem,
+		"version", version,
+		"vulnCount", len(vulnerabilities))
+
+	return nil
 }
 
 // GetLatestScans gets the most recent vulnerability scans

@@ -80,6 +80,7 @@ DB_USER=postgres
 DB_PASSWORD=your_password_here
 DB_NAME=package_scanner
 DB_SSL_MODE=disable
+USE_DB=true
 ```
 
 ### API Configuration

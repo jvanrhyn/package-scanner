@@ -17,7 +17,13 @@ func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("Warning: .env file not found or cannot be read. Using defaults and command line flags.")
+	} else {
+		log.Println("Successfully loaded .env file")
 	}
+
+	// Debug to see if env vars are being loaded at all
+	logFormatEnv := os.Getenv("LOG_FORMAT")
+	log.Printf("DEBUG: LOG_FORMAT environment value: '%s'", logFormatEnv)
 
 	// Check if any command-line arguments were provided
 	tuiMode := len(os.Args) == 1 // If no args, run in TUI mode
@@ -41,6 +47,9 @@ func main() {
 	} else {
 		// Create config from command-line flags and environment variables
 		config = cli.NewConfig()
+
+		// Debug log to see the actual UseDB value that was set
+		log.Printf("DEBUG: Final UseDB configuration value: %v", config.UseDB)
 	}
 
 	// Initialize logging system
