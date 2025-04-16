@@ -9,13 +9,17 @@ import (
 )
 
 func main() {
-	// Create a logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// Create a logger with text output for easier reading in the test
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
 
-	// Create a scanner for NuGet packages
+	// Initialize the scanner for NuGet packages
 	packageScanner := scanner.NewPackageScanner("nupkg", "NuGet", logger)
 
-	// Test with the example filename
+	fmt.Println("Testing package name and version extraction from filenames...")
+
+	// Test with sample filenames (not real files)
 	testFilenames := []string{
 		"System.Text.RegularExpressions.4.3.0.nupkg",
 		"System.Threading.4.3.0.nupkg",
@@ -24,7 +28,8 @@ func main() {
 	}
 
 	for _, filename := range testFilenames {
-		// Extract package info
+		// Extract package info from the filename string
+		// Note: This is only testing the parsing logic, not actual file operations
 		pkgInfo, err := packageScanner.ExtractPackageInfo(filename)
 		if err != nil {
 			fmt.Printf("Error extracting package info from %s: %v\n", filename, err)

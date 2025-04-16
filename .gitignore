@@ -6,6 +6,9 @@ g# Binaries for programs and plugins
 *.dylib
 package-scanner
 
+# Binary output folder for Go projects
+bin/
+
 # Test binary, built with `go test -c`
 *.test
 
